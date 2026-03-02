@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sage-50: #f4f7f4;
+  --color-sage-100: #e4ebe3;
+  --color-sage-200: #c8d7c6;
+  --color-sage-300: #a3bca0;
+  --color-sage-400: #8ba888;
+  --color-sage-500: #6b8f68;
+  --color-sage-600: #547352;
+  --color-sage-700: #435c42;
+  --color-sage-800: #374a37;
+  --color-sage-900: #2e3d2e;
+
+  --color-lavender-50: #f5f3f8;
+  --color-lavender-100: #ede8f3;
+  --color-lavender-200: #d8cee6;
+  --color-lavender-300: #b8a6d1;
+  --color-lavender-400: #9b7ebd;
+  --color-lavender-500: #8161a8;
+  --color-lavender-600: #6b4c8e;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+@layer base {
+  * { border-color: theme(colors.zinc.800 / 40%); }
+  body {
+    @apply bg-zinc-950 text-zinc-100 antialiased m-0;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+  #root { @apply min-h-screen; }
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: theme(colors.zinc.800); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: theme(colors.zinc.700); }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
