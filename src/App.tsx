@@ -11,15 +11,14 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Mail, MailOpen, Archive, Clock, Search, Tag, Star, Send,
-  ShoppingCart, Package, Truck, CreditCard, Inbox, Home,
+  Mail, Archive, Clock, Search, Tag, Star, Send,
+  ShoppingCart, Package, Truck, CreditCard, Inbox,
   ChevronRight, ChevronDown, Paperclip, Reply, Forward,
-  AlertTriangle, CheckCircle2, Brain, Sparkles, ArrowRight,
-  ExternalLink, User, Building2, TrendingUp, TrendingDown,
-  Minus, DollarSign, FileText, X, Check, AlertCircle, Zap,
-  Eye, EyeOff, Keyboard, BarChart3, Users, Settings, Bell,
-  PanelRightClose, PanelRightOpen, ChevronUp, Layers,
-  LayoutDashboard, Receipt, Boxes, Globe, Activity,
+  CheckCircle2, Brain, Sparkles,
+  ExternalLink, User, Building2, TrendingUp,
+  Minus, DollarSign, FileText, Check,
+  Keyboard, BarChart3, Users,
+  PanelRightClose, PanelRightOpen, Layers,
 } from "lucide-react";
 
 // ============================================================================
