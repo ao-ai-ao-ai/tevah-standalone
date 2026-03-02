@@ -10,9 +10,9 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   Mail, Archive, Star, Search,
   ShoppingCart, Inbox,
-  ChevronRight, Paperclip, Reply, Forward,
+  Paperclip, Reply, Forward,
   Brain, Sparkles,
-  ExternalLink, User, Building2, TrendingUp,
+  ExternalLink, User,
   DollarSign, FileText, Check,
   Keyboard, BarChart3, Users, Layers,
   PanelRightClose, PanelRightOpen, Package, Truck,
@@ -101,7 +101,7 @@ export default function App() {
     setSelectedEmailId(emailId);
   };
 
-  const navigateToOrder = (orderId: string) => {
+  const navigateToOrder = (_orderId: string) => {
     setActiveSection("orders");
   };
 

@@ -107,20 +107,6 @@ export const STAGE_PIPELINE: Array<{
   { code: "B15", name: "Lost", group: "CLOSED", mondayStages: ["Lost"], color: "text-zinc-500", bgColor: "bg-zinc-800/50" },
 ];
 
-function mondayStageToCode(mondayStage: string): string {
-  for (const s of STAGE_PIPELINE) {
-    if (s.mondayStages.includes(mondayStage)) return s.code;
-  }
-  return "B1";
-}
-
-function mondayStageToName(mondayStage: string): string {
-  for (const s of STAGE_PIPELINE) {
-    if (s.mondayStages.includes(mondayStage)) return s.name;
-  }
-  return "New Deal";
-}
-
 // ============================================================================
 // REAL ORDERS — Top 30 deals from Monday.com ($15.8M book)
 // ============================================================================
