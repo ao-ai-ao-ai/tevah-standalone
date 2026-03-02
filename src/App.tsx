@@ -8,7 +8,7 @@
  * Every pixel designed to make Turian AI look like child's play.
  */
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Mail, Archive, Clock, Search, Tag, Star, Send,
