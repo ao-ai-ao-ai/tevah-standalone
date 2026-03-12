@@ -1,607 +1,382 @@
 /**
  * TEVAH — Built for the Three-Party Deal
  * ========================================
- * Standalone showcase. Zero Hercules. Pure Tevah.
- * Real data from Monday.com (500 deals, $15.8M).
+ * The Call as home. 20 screens. DSV2 design system.
+ * URL routing via react-router-dom.
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Mail, Archive, Star, Search,
-  ShoppingCart, Inbox,
-  Paperclip, Reply, Forward,
-  Brain, Sparkles,
-  ExternalLink, User,
-  DollarSign, FileText, Check,
-  Keyboard, BarChart3, Users, Layers,
-  PanelRightClose, PanelRightOpen, Package, Truck,
+  Mail, Inbox,
+  Zap, BarChart3, Users, Layers,
+  Package, ShoppingCart, ShoppingBag, Box,
+  Command, Check, DollarSign, Target, Tag,
+  Receipt, Truck, FileText, Shield, ClipboardList,
+  Radar,
 } from "lucide-react";
-import { cn, formatCurrency, formatCurrencyExact } from "./lib/utils";
-import { EMAILS, ORDERS, STAGE_PIPELINE, type Email, type SplitTab, type ThreeWayScenario } from "./data/emails";
+import { cn } from "./lib/utils";
+import { isSlaBreached } from "./data/emails";
+import { ALL_DEALS } from "./data/monday";
+import { getDecisions } from "./data/decisions";
+import { BoatLogo } from "./components/boat-logo";
+import { AtmosphericBackground } from "./components/atmospheric-bg";
+import { CommandPalette, type NavSection } from "./components/command-palette";
+import { Card } from "./components/card";
+
+// Views
+import { TheCallView } from "./views/TheCallView";
 import DashboardView from "./views/DashboardView";
 import PipelineView from "./views/PipelineView";
 import OrdersView from "./views/OrdersView";
+import { OrderDetailView } from "./views/OrderDetailView";
 import CustomersView from "./views/CustomersView";
 import VendorsView from "./views/VendorsView";
+import { BuysView } from "./views/BuysView";
+import { ItemsView } from "./views/ItemsView";
+import FinanceView from "./views/FinanceView";
+import WishlistView from "./views/WishlistView";
+import BrandsView from "./views/BrandsView";
+import { InboxView } from "./views/InboxView";
+import { OffersView } from "./views/OffersView";
+import AnalyticsView from "./views/AnalyticsView";
+import { ActivityView } from "./views/ActivityView";
+// New views
+import { InvoicesView } from "./views/InvoicesView";
+import { ShippingView } from "./views/ShippingView";
+import { DocumentsView } from "./views/DocumentsView";
+import { AuditView } from "./views/AuditView";
+import { PurchaseOrdersView } from "./views/PurchaseOrdersView";
+import { ReconView } from "./views/ReconView";
 
 // ============================================================================
-// NAV SECTION TYPE
+// Route → section mapping
 // ============================================================================
 
-type NavSection = "inbox" | "pipeline" | "orders" | "customers" | "vendors" | "dashboard";
+type ExtendedNav = NavSection | "invoices" | "shipping" | "documents" | "audit" | "purchase-orders" | "recon";
 
-// ============================================================================
-// SCENARIO BADGES
-// ============================================================================
-
-const SCENARIO_CONFIG: Record<ThreeWayScenario, { label: string; color: string; bg: string }> = {
-  MATCH: { label: "Match", color: "text-emerald-400", bg: "bg-emerald-500/10" },
-  PREMIUM: { label: "Premium", color: "text-violet-400", bg: "bg-violet-500/10" },
-  DISCOUNT_OK: { label: "Discount OK", color: "text-blue-400", bg: "bg-blue-500/10" },
-  DISCOUNT_BELOW: { label: "Below Floor", color: "text-amber-400", bg: "bg-amber-500/10" },
-  LOSS: { label: "Loss", color: "text-red-400", bg: "bg-red-500/10" },
+const ROUTE_MAP: Record<string, ExtendedNav> = {
+  "/": "the-call",
+  "/dashboard": "dashboard",
+  "/inbox": "inbox",
+  "/pipeline": "pipeline",
+  "/orders": "orders",
+  "/offers": "offers",
+  "/purchase-orders": "purchase-orders",
+  "/customers": "customers",
+  "/vendors": "vendors",
+  "/invoices": "invoices",
+  "/shipping": "shipping",
+  "/documents": "documents",
+  "/items": "items",
+  "/buys": "buys",
+  "/brands": "brands",
+  "/wishlist": "wishlist",
+  "/finance": "finance",
+  "/analytics": "analytics",
+  "/audit": "audit",
+  "/activity": "activity",
+  "/recon": "recon",
 };
 
-// ============================================================================
-// URGENCY CONFIG
-// ============================================================================
-
-const URGENCY: Record<string, { dot: string; border: string }> = {
-  urgent: { dot: "bg-red-500", border: "border-l-red-500/60" },
-  high: { dot: "bg-amber-500", border: "border-l-amber-500/40" },
-  medium: { dot: "bg-blue-500", border: "border-l-blue-500/30" },
-  low: { dot: "bg-zinc-600", border: "border-l-zinc-700/30" },
-};
+const SECTION_TO_PATH: Record<ExtendedNav, string> = Object.fromEntries(
+  Object.entries(ROUTE_MAP).map(([path, section]) => [section, path])
+) as Record<ExtendedNav, string>;
 
 // ============================================================================
-// MAIN APP
+// SHELL (sidebar + content)
 // ============================================================================
 
-export default function App() {
-  const [activeSection, setActiveSection] = useState<NavSection>("inbox");
-  const [activeTab, setActiveTab] = useState<SplitTab>("all");
-  const [selectedEmailId, setSelectedEmailId] = useState<string | null>("1");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showIntelligence, setShowIntelligence] = useState(true);
+function AppShell() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [showKeys, setShowKeys] = useState(false);
-
-  // Mutable email state
-  const [emails, setEmails] = useState(EMAILS);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string }>>([]);
 
-  const addToast = (message: string) => {
-    const id = Date.now().toString();
-    setToasts(prev => [...prev, { id, message }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+  // Easter egg: 5-click logo → Harvest
+  const logoClickRef = useRef({ count: 0, timer: 0 as ReturnType<typeof setTimeout> });
+  const handleLogoClick = useCallback(() => {
+    const lc = logoClickRef.current;
+    clearTimeout(lc.timer);
+    lc.count += 1;
+    if (lc.count >= 5) {
+      lc.count = 0;
+      window.location.href = "https://harvest.158-101-101-234.sslip.io";
+    } else {
+      lc.timer = setTimeout(() => { lc.count = 0; }, 2000);
+    }
+  }, []);
+
+  // Derive active section from URL
+  const activeSection: ExtendedNav = useMemo(() => {
+    const path = location.pathname;
+    if (path.startsWith("/orders/")) return "orders";
+    return ROUTE_MAP[path] || "the-call";
+  }, [location.pathname]);
+
+  // Extract order ID from URL
+  useEffect(() => {
+    const match = location.pathname.match(/^\/orders\/(.+)$/);
+    if (match) setSelectedOrderId(match[1]);
+    else if (location.pathname === "/orders") setSelectedOrderId(null);
+  }, [location.pathname]);
+
+  // Navigation helpers
+  const navigateTo = (section: ExtendedNav) => {
+    const path = SECTION_TO_PATH[section] || "/";
+    navigate(path);
   };
 
-  // Actions
-  const archiveEmail = (emailId: string) => {
-    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, isArchived: true } : e));
-    addToast("Email archived");
-    if (selectedEmailId === emailId) {
-      const visible = emails.filter(e => !e.isArchived && e.id !== emailId);
-      setSelectedEmailId(visible[0]?.id || null);
+  const navigateToOrder = (orderId: string) => {
+    navigate(`/orders/${orderId}`);
+  };
+
+  const navigateFromDashboard = (section: string, _id?: string) => {
+    const path = SECTION_TO_PATH[section as ExtendedNav] || "/";
+    navigate(path);
+  };
+
+  const navigateFromPalette = (section: NavSection, _id?: string) => {
+    if (section === "orders" && _id) {
+      navigate(`/orders/${_id}`);
+    } else {
+      const path = SECTION_TO_PATH[section] || "/";
+      navigate(path);
     }
   };
-
-  const toggleStar = (emailId: string) => {
-    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, isStarred: !e.isStarred } : e));
-  };
-
-  const createOrder = (email: Email) => {
-    addToast(`Order created from ${email.company} email`);
-    setEmails(prev => prev.map(e => e.id === email.id ? { ...e, hasOrder: true } : e));
-  };
-
-  // Navigation from other views
-  const navigateToEmail = (emailId: string) => {
-    setActiveSection("inbox");
-    setSelectedEmailId(emailId);
-  };
-
-  const navigateToOrder = (_orderId: string) => {
-    setActiveSection("orders");
-  };
-
-  const navigateFromDashboard = (section: string, id?: string) => {
-    setActiveSection(section as NavSection);
-    if (section === "inbox" && id) setSelectedEmailId(id);
-  };
-
-  // Filtered emails
-  const filteredEmails = useMemo(() => {
-    return emails
-      .filter(e => !e.isArchived)
-      .filter(e => activeTab === "all" || e.category === activeTab)
-      .filter(e => !searchQuery ||
-        e.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        e.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        e.company.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-  }, [emails, activeTab, searchQuery]);
-
-  const selectedEmail = emails.find(e => e.id === selectedEmailId);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return;
-      if (activeSection !== "inbox") return;
-      if (e.key === "j" || e.key === "ArrowDown") {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        const idx = filteredEmails.findIndex(em => em.id === selectedEmailId);
-        if (idx < filteredEmails.length - 1) setSelectedEmailId(filteredEmails[idx + 1].id);
+        setShowCommandPalette(v => !v);
+        return;
       }
-      if (e.key === "k" || e.key === "ArrowUp") {
-        e.preventDefault();
-        const idx = filteredEmails.findIndex(em => em.id === selectedEmailId);
-        if (idx > 0) setSelectedEmailId(filteredEmails[idx - 1].id);
-      }
-      if (e.key === "e" && selectedEmailId) archiveEmail(selectedEmailId);
-      if (e.key === "s" && selectedEmailId) toggleStar(selectedEmailId);
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
       if (e.key === "?" || (e.key === "/" && e.shiftKey)) setShowKeys(v => !v);
-      if (e.key === "i") setShowIntelligence(v => !v);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [filteredEmails, selectedEmailId, activeSection]);
+  }, []);
 
-  // Split tabs
-  const splitTabs: Array<{ id: SplitTab; label: string; count: number }> = [
-    { id: "all", label: "All", count: emails.filter(e => !e.isArchived).length },
-    { id: "orders", label: "Orders", count: emails.filter(e => !e.isArchived && e.category === "orders").length },
-    { id: "quotes", label: "Quotes", count: emails.filter(e => !e.isArchived && e.category === "quotes").length },
-    { id: "suppliers", label: "Suppliers", count: emails.filter(e => !e.isArchived && e.category === "suppliers").length },
-    { id: "shipping", label: "Shipping", count: emails.filter(e => !e.isArchived && e.category === "shipping").length },
-    { id: "payments", label: "Payments", count: emails.filter(e => !e.isArchived && e.category === "payments").length },
-  ];
+  // Counts
+  const decisions = useMemo(() => getDecisions(), []);
+  const activeDealCount = useMemo(() => ALL_DEALS.filter(d => !["Won", "Lost"].includes(d.stage)).length, []);
+  const breachedCount = useMemo(() => ALL_DEALS.filter(d => !["Won", "Lost"].includes(d.stage) && isSlaBreached(d)).length, []);
+  const overdueCount = useMemo(() => ALL_DEALS.filter(d => d.payment === "Overdue").length, []);
 
-  // Nav items
-  const navItems: Array<{ id: NavSection; icon: typeof Mail; label: string; count?: number }> = [
-    { id: "dashboard", icon: BarChart3, label: "Dashboard" },
-    { id: "inbox", icon: Inbox, label: "Inbox", count: emails.filter(e => e.isUnread && !e.isArchived).length },
-    { id: "pipeline", icon: Layers, label: "Pipeline", count: ORDERS.filter(o => o.slaBreached).length },
-    { id: "orders", icon: ShoppingCart, label: "Orders", count: ORDERS.length },
+  const navItems: Array<{ id: ExtendedNav; icon: typeof Mail; label: string; count?: number; accent?: boolean; separator?: boolean }> = [
+    { id: "the-call", icon: Zap, label: "The Call", count: decisions.length > 0 ? decisions.length : undefined, accent: true },
+    { id: "dashboard", icon: BarChart3, label: "Dashboard", separator: true },
+    { id: "inbox", icon: Inbox, label: "Inbox" },
+    { id: "pipeline", icon: Layers, label: "Pipeline", count: breachedCount > 0 ? breachedCount : undefined },
+    { id: "orders", icon: ShoppingCart, label: "Orders", count: activeDealCount },
+    { id: "offers", icon: Tag, label: "Offers" },
+    { id: "purchase-orders", icon: ClipboardList, label: "VPOs" },
     { id: "customers", icon: Users, label: "Customers" },
-    { id: "vendors", icon: Package, label: "Vendors" },
+    { id: "vendors", icon: Package, label: "Vendors", separator: true },
+    { id: "invoices", icon: Receipt, label: "Invoices", count: overdueCount > 0 ? overdueCount : undefined },
+    { id: "shipping", icon: Truck, label: "Shipping" },
+    { id: "documents", icon: FileText, label: "Documents" },
+    { id: "items", icon: Box, label: "Items" },
+    { id: "buys", icon: ShoppingBag, label: "Buys", separator: true },
+    { id: "brands", icon: Tag, label: "Brands" },
+    { id: "wishlist", icon: Target, label: "Wishlist" },
+    { id: "finance", icon: DollarSign, label: "Finance" },
+    { id: "analytics", icon: BarChart3, label: "Analytics" },
+    { id: "audit", icon: Shield, label: "Audit" },
+    { id: "activity", icon: Zap, label: "Activity", separator: true },
+    { id: "recon", icon: Radar, label: "Recon", accent: true },
   ];
 
   return (
-    <div className="h-screen flex bg-zinc-950 text-zinc-100 overflow-hidden select-none">
-      {/* ═══════ NAV SIDEBAR ═══════ */}
-      <div className="w-[52px] flex-none flex flex-col items-center py-3 gap-1 border-r border-zinc-800/60 bg-zinc-950">
-        {/* Logo */}
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/20 to-blue-500/20 flex items-center justify-center mb-3">
-          <span className="text-[10px] font-black text-violet-300 tracking-tighter">T</span>
+    <div className="h-screen flex bg-canvas text-text-primary overflow-hidden select-none">
+      <AtmosphericBackground />
+
+      {/* NAV SIDEBAR */}
+      <motion.div
+        className="flex-none flex flex-col items-center py-3 gap-1 border-r border-divider bg-sidebar z-10"
+        animate={{ width: sidebarExpanded ? 180 : 52 }}
+        transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        onMouseEnter={() => setSidebarExpanded(true)}
+        onMouseLeave={() => setSidebarExpanded(false)}
+      >
+        <div className="mb-3 flex items-center gap-2 px-1.5 w-full justify-center" onClick={handleLogoClick} style={{ cursor: "pointer" }}>
+          <BoatLogo size={32} />
+          <AnimatePresence>
+            {sidebarExpanded && (
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                className="text-sm font-bold tracking-wide overflow-hidden whitespace-nowrap text-lavender-500"
+              >
+                TEVAH
+              </motion.span>
+            )}
+          </AnimatePresence>
         </div>
 
-        {navItems.map(item => (
-          <button
-            key={item.id}
-            onClick={() => setActiveSection(item.id)}
-            className={cn(
-              "relative w-9 h-9 rounded-lg flex items-center justify-center transition-all group",
-              activeSection === item.id
-                ? "bg-violet-500/10 text-violet-400"
-                : "text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800/40"
-            )}
-          >
-            <item.icon className="w-4 h-4" />
-            {item.count && item.count > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-violet-500 text-[7px] font-bold text-white flex items-center justify-center">
-                {item.count > 9 ? "9+" : item.count}
-              </span>
-            )}
-            {/* Tooltip */}
-            <span className="absolute left-full ml-2 px-2 py-1 text-[10px] rounded bg-zinc-800 text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-              {item.label}
-            </span>
-          </button>
-        ))}
+        <div className="flex-1 overflow-y-auto scrollbar-none w-full space-y-0.5 px-1.5">
+          {navItems.map((item, idx) => (
+            <div key={item.id}>
+              {idx > 0 && navItems[idx - 1]?.separator && (
+                <div className="w-6 mx-auto border-t border-divider my-1.5" />
+              )}
+              <button
+                onClick={() => navigateTo(item.id)}
+                className={cn(
+                  "relative flex items-center gap-2.5 rounded-lg transition-all w-full px-2",
+                  sidebarExpanded ? "h-8 justify-start" : "h-8 w-8 justify-center mx-auto",
+                  activeSection === item.id
+                    ? item.accent ? "bg-purple-50 text-purple-600" : "bg-hover text-purple-600"
+                    : "text-text-tertiary hover:text-text-secondary hover:bg-hover"
+                )}
+              >
+                <item.icon className="w-4 h-4 flex-none" />
+                <AnimatePresence>
+                  {sidebarExpanded && (
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="text-xs font-medium overflow-hidden whitespace-nowrap"
+                    >
+                      {item.label}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+                {item.count && item.count > 0 && (
+                  <span className={cn(
+                    "absolute rounded-full text-[7px] font-bold text-white flex items-center justify-center",
+                    item.accent ? "bg-purple-500" : "bg-lavender-500",
+                    sidebarExpanded ? "right-2 w-5 h-4" : "-top-0.5 -right-0.5 w-3.5 h-3.5"
+                  )}>
+                    {item.count > 99 ? "99" : item.count}
+                  </span>
+                )}
+              </button>
+            </div>
+          ))}
+        </div>
 
-        <div className="flex-1" />
         <button
-          onClick={() => setShowKeys(v => !v)}
-          className="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-700 hover:text-zinc-400 transition-colors"
+          onClick={() => setShowCommandPalette(true)}
+          className={cn(
+            "flex items-center gap-2 rounded-lg text-text-tertiary hover:text-purple-600 hover:bg-hover transition-colors mt-1",
+            sidebarExpanded ? "w-full px-2 h-8 justify-start mx-1.5" : "w-8 h-8 justify-center"
+          )}
         >
-          <Keyboard className="w-4 h-4" />
+          <Command className="w-4 h-4 flex-none" />
+          {sidebarExpanded && (
+            <span className="text-[10px] text-text-tertiary">
+              <kbd className="px-1 py-0.5 rounded bg-white text-text-tertiary border border-divider text-[9px] shadow-[var(--shadow-sm)]">⌘K</kbd>
+            </span>
+          )}
         </button>
-      </div>
+      </motion.div>
 
-      {/* ═══════ MAIN CONTENT ═══════ */}
+      {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col min-w-0">
         <AnimatePresence mode="wait">
-          {activeSection === "dashboard" && (
-            <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <DashboardView onNavigate={navigateFromDashboard} />
-            </motion.div>
-          )}
-
-          {activeSection === "inbox" && (
-            <motion.div key="inbox" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex">
-              {/* ═══════ EMAIL LIST ═══════ */}
-              <div className="w-[340px] flex-none flex flex-col border-r border-zinc-800/60">
-                {/* Search */}
-                <div className="flex-none px-3 py-2.5 border-b border-zinc-800/60">
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600" />
-                    <input
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      placeholder="Search emails..."
-                      className="w-full h-8 pl-8 pr-3 text-xs bg-zinc-900/50 border border-zinc-800/40 rounded-lg text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/30"
-                    />
-                  </div>
-                </div>
-
-                {/* Split Tabs */}
-                <div className="flex-none px-2 py-1.5 border-b border-zinc-800/60 flex gap-0.5 overflow-x-auto">
-                  {splitTabs.map(tab => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={cn(
-                        "px-2.5 py-1 rounded-md text-[10px] font-medium whitespace-nowrap transition-all",
-                        activeTab === tab.id
-                          ? "bg-violet-500/10 text-violet-300"
-                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/40"
-                      )}
-                    >
-                      {tab.label}
-                      {tab.count > 0 && <span className="ml-1 text-zinc-600">{tab.count}</span>}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Email List */}
-                <div className="flex-1 overflow-y-auto">
-                  {filteredEmails.map(email => (
-                    <button
-                      key={email.id}
-                      onClick={() => { setSelectedEmailId(email.id); setEmails(prev => prev.map(e => e.id === email.id ? { ...e, isUnread: false } : e)); }}
-                      className={cn(
-                        "w-full text-left px-3 py-2.5 border-b border-zinc-800/20 border-l-2 transition-all",
-                        URGENCY[email.urgency]?.border,
-                        selectedEmailId === email.id ? "bg-violet-500/5" : "hover:bg-zinc-800/20",
-                        email.isUnread && "bg-zinc-900/40"
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {email.isUnread && <span className={cn("w-1.5 h-1.5 rounded-full flex-none", URGENCY[email.urgency]?.dot)} />}
-                          <span className={cn("text-xs truncate", email.isUnread ? "font-semibold text-white" : "text-zinc-300")}>{email.from}</span>
-                        </div>
-                        <span className="text-[10px] text-zinc-600 flex-none ml-2">{email.timeAgo}</span>
-                      </div>
-                      <p className={cn("text-[11px] truncate", email.isUnread ? "text-zinc-200" : "text-zinc-400")}>{email.subject}</p>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-zinc-800/60 text-zinc-500">{email.aiCategory}</span>
-                        {email.hasOrder && <ShoppingCart className="w-2.5 h-2.5 text-violet-400/60" />}
-                        {email.isStarred && <Star className="w-2.5 h-2.5 text-amber-400/60 fill-amber-400/60" />}
-                        {email.attachments.length > 0 && <Paperclip className="w-2.5 h-2.5 text-zinc-600" />}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* ═══════ THREAD VIEW ═══════ */}
-              <div className="flex-1 flex flex-col min-w-0">
-                {selectedEmail ? (
-                  <>
-                    {/* Thread header */}
-                    <div className="flex-none px-5 py-3 border-b border-zinc-800/60">
-                      <div className="flex items-center justify-between">
-                        <div className="min-w-0">
-                          <h2 className="text-sm font-semibold text-white truncate">{selectedEmail.subject}</h2>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[10px] text-zinc-500">{selectedEmail.from} &lt;{selectedEmail.fromEmail}&gt;</span>
-                            <span className="text-[10px] text-zinc-700">•</span>
-                            <span className="text-[10px] text-zinc-600">{selectedEmail.time}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 flex-none">
-                          <button onClick={() => toggleStar(selectedEmail.id)} className="p-1.5 rounded-md hover:bg-zinc-800/40 transition-colors">
-                            <Star className={cn("w-3.5 h-3.5", selectedEmail.isStarred ? "text-amber-400 fill-amber-400" : "text-zinc-600")} />
-                          </button>
-                          <button onClick={() => archiveEmail(selectedEmail.id)} className="p-1.5 rounded-md hover:bg-zinc-800/40 transition-colors">
-                            <Archive className="w-3.5 h-3.5 text-zinc-600" />
-                          </button>
-                          <button onClick={() => setShowIntelligence(v => !v)} className="p-1.5 rounded-md hover:bg-zinc-800/40 transition-colors">
-                            {showIntelligence ? <PanelRightClose className="w-3.5 h-3.5 text-zinc-600" /> : <PanelRightOpen className="w-3.5 h-3.5 text-zinc-600" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* AI Summary Bar */}
-                      <div className="mt-2 p-2.5 rounded-lg bg-violet-500/5 border border-violet-500/10">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <Brain className="w-3 h-3 text-violet-400" />
-                          <span className="text-[9px] text-violet-400 font-medium uppercase tracking-wider">AI Summary</span>
-                        </div>
-                        <p className="text-[11px] text-zinc-300 leading-relaxed">{selectedEmail.aiSummary}</p>
-                      </div>
-                    </div>
-
-                    {/* Email body */}
-                    <div className="flex-1 overflow-y-auto px-5 py-4">
-                      <div className="prose prose-invert prose-sm max-w-none">
-                        <div className="whitespace-pre-wrap text-[13px] text-zinc-300 leading-relaxed font-[inherit]">
-                          {selectedEmail.body}
-                        </div>
-                      </div>
-
-                      {/* Attachments */}
-                      {selectedEmail.attachments.length > 0 && (
-                        <div className="mt-4 flex gap-2 flex-wrap">
-                          {selectedEmail.attachments.map(att => (
-                            <div key={att} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-zinc-900/60 border border-zinc-800/40 text-[10px] text-zinc-400">
-                              <FileText className="w-3 h-3" />
-                              {att}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Actions */}
-                      <div className="mt-4 flex gap-2">
-                        <button className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] rounded-md bg-zinc-900/60 border border-zinc-800/40 text-zinc-400 hover:text-zinc-200 transition-colors">
-                          <Reply className="w-3 h-3" /> Reply
-                        </button>
-                        <button className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] rounded-md bg-zinc-900/60 border border-zinc-800/40 text-zinc-400 hover:text-zinc-200 transition-colors">
-                          <Forward className="w-3 h-3" /> Forward
-                        </button>
-                        {!selectedEmail.hasOrder && selectedEmail.extraction && (
-                          <button
-                            onClick={() => createOrder(selectedEmail)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] rounded-md bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors"
-                          >
-                            <ShoppingCart className="w-3 h-3" /> Create Order
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center">
-                    <p className="text-sm text-zinc-600">Select an email to read</p>
-                  </div>
-                )}
-              </div>
-
-              {/* ═══════ INTELLIGENCE PANEL ═══════ */}
-              {showIntelligence && selectedEmail && (
-                <motion.div
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: 300, opacity: 1 }}
-                  exit={{ width: 0, opacity: 0 }}
-                  className="flex-none w-[300px] border-l border-zinc-800/60 overflow-y-auto p-3 space-y-3"
-                >
-                  {/* Customer Card */}
-                  {selectedEmail.customer && (
-                    <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/40">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500/20 to-blue-500/20 flex items-center justify-center">
-                          <User className="w-3 h-3 text-violet-300" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-white">{selectedEmail.customer.name}</p>
-                          <span className={cn("text-[8px] px-1 py-0.5 rounded-full",
-                            selectedEmail.customer.tier === "Platinum" ? "bg-violet-500/10 text-violet-400" :
-                            selectedEmail.customer.tier === "Gold" ? "bg-amber-500/10 text-amber-400" :
-                            "bg-zinc-800 text-zinc-500"
-                          )}>{selectedEmail.customer.tier}</span>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5 text-[9px]">
-                        <div><span className="text-zinc-600">Lifetime</span><p className="text-zinc-200 font-semibold">{formatCurrency(selectedEmail.customer.totalRevenue)}</p></div>
-                        <div><span className="text-zinc-600">Health</span><p className={cn("font-semibold", selectedEmail.customer.healthScore >= 80 ? "text-emerald-400" : selectedEmail.customer.healthScore >= 60 ? "text-amber-400" : "text-red-400")}>{selectedEmail.customer.healthScore}</p></div>
-                        <div><span className="text-zinc-600">Open Orders</span><p className="text-zinc-200 font-semibold">{selectedEmail.customer.openOrders}</p></div>
-                        <div><span className="text-zinc-600">Terms</span><p className="text-zinc-200 font-semibold">{selectedEmail.customer.paymentTerms}</p></div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* AI Extraction */}
-                  {selectedEmail.extraction && (
-                    <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/40">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Sparkles className="w-3 h-3 text-violet-400" />
-                        <span className="text-[9px] text-violet-400 font-medium uppercase tracking-wider">AI Extraction</span>
-                        <span className="ml-auto text-[8px] text-zinc-600">{Math.round(selectedEmail.extraction.confidence * 100)}% confidence</span>
-                      </div>
-                      <div className="space-y-1">
-                        {selectedEmail.extraction.items.map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between py-1 border-b border-zinc-800/20 last:border-0">
-                            <div>
-                              <p className="text-[10px] text-zinc-300">{item.product}</p>
-                              <span className="text-[9px] text-zinc-600">{item.qty} × {formatCurrencyExact(item.price)}</span>
-                            </div>
-                            <span className={cn("text-[8px] px-1 py-0.5 rounded",
-                              item.status === "In Stock" ? "bg-emerald-500/10 text-emerald-400" :
-                              item.status === "Low Stock" ? "bg-amber-500/10 text-amber-400" :
-                              "bg-zinc-800 text-zinc-500"
-                            )}>{item.status}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-2 pt-2 border-t border-zinc-800/30 flex items-center justify-between">
-                        <span className="text-[9px] text-zinc-500">Total</span>
-                        <span className="text-xs font-bold text-white tabular-nums">{formatCurrencyExact(selectedEmail.extraction.total)}</span>
-                      </div>
-                      {selectedEmail.extraction.shipBy && (
-                        <div className="flex items-center gap-1 mt-1">
-                          <Truck className="w-2.5 h-2.5 text-zinc-600" />
-                          <span className="text-[9px] text-zinc-500">Ship by {selectedEmail.extraction.shipBy}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Three-Way Pricing */}
-                  {selectedEmail.threeWay && (
-                    <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/40">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1.5">
-                          <DollarSign className="w-3 h-3 text-emerald-400" />
-                          <span className="text-[9px] text-emerald-400 font-medium uppercase tracking-wider">3-Way Pricing</span>
-                        </div>
-                        <span className={cn("text-[8px] px-1.5 py-0.5 rounded-full font-medium",
-                          SCENARIO_CONFIG[selectedEmail.threeWay.scenario]?.bg,
-                          SCENARIO_CONFIG[selectedEmail.threeWay.scenario]?.color
-                        )}>
-                          {SCENARIO_CONFIG[selectedEmail.threeWay.scenario]?.label}
-                        </span>
-                      </div>
-
-                      {/* Three-Way Bar */}
-                      <div className="space-y-1.5">
-                        {[
-                          { label: "Vendor Cost", value: selectedEmail.threeWay.vendorCost, color: "bg-red-500/60" },
-                          { label: "Our Offer", value: selectedEmail.threeWay.ourOffer, color: "bg-violet-500/60" },
-                          { label: "Customer Ask", value: selectedEmail.threeWay.customerAsk, color: "bg-emerald-500/60" },
-                        ].map(row => (
-                          <div key={row.label}>
-                            <div className="flex items-center justify-between text-[9px] mb-0.5">
-                              <span className="text-zinc-500">{row.label}</span>
-                              <span className="text-zinc-300 font-mono tabular-nums">{formatCurrencyExact(row.value)}</span>
-                            </div>
-                            <div className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                              <div
-                                className={cn("h-full rounded-full", row.color)}
-                                style={{ width: `${(row.value / selectedEmail.threeWay!.customerAsk) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="mt-2 pt-2 border-t border-zinc-800/30 flex items-center justify-between">
-                        <span className="text-[9px] text-zinc-500">Margin</span>
-                        <span className={cn("text-sm font-bold tabular-nums",
-                          selectedEmail.threeWay.margin >= 15 ? "text-emerald-400" :
-                          selectedEmail.threeWay.margin >= 10 ? "text-amber-400" : "text-red-400"
-                        )}>
-                          {selectedEmail.threeWay.margin}%
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Linked Order */}
-                  {selectedEmail.orderId && (
-                    <button
-                      onClick={() => navigateToOrder(selectedEmail.orderId!)}
-                      className="w-full p-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800/40 hover:border-zinc-700/40 transition-colors text-left"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <ShoppingCart className="w-3 h-3 text-violet-400" />
-                          <span className="text-[9px] text-violet-400 font-medium uppercase tracking-wider">Linked Order</span>
-                        </div>
-                        <ExternalLink className="w-3 h-3 text-zinc-600" />
-                      </div>
-                      {(() => {
-                        const order = ORDERS.find(o => o.id === selectedEmail.orderId);
-                        if (!order) return null;
-                        const stage = STAGE_PIPELINE.find(s => s.code === order.stageCode);
-                        return (
-                          <div className="mt-1.5">
-                            <span className="text-[10px] font-mono text-zinc-400">#{order.orderNumber}</span>
-                            <span className={cn("ml-1.5 text-[8px] px-1 py-0.5 rounded", stage?.bgColor, stage?.color)}>{order.stageCode}</span>
-                            <p className="text-[10px] text-zinc-300 mt-0.5">{order.brand} — {formatCurrency(order.totalAmount)}</p>
-                          </div>
-                        );
-                      })()}
-                    </button>
-                  )}
-                </motion.div>
-              )}
-            </motion.div>
-          )}
-
-          {activeSection === "pipeline" && (
-            <motion.div key="pipeline" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <PipelineView onNavigateToOrder={navigateToOrder} />
-            </motion.div>
-          )}
-
-          {activeSection === "orders" && (
-            <motion.div key="orders" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <OrdersView onNavigateToEmail={navigateToEmail} />
-            </motion.div>
-          )}
-
-          {activeSection === "customers" && (
-            <motion.div key="customers" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <CustomersView />
-            </motion.div>
-          )}
-
-          {activeSection === "vendors" && (
-            <motion.div key="vendors" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-              <VendorsView />
-            </motion.div>
-          )}
+          <motion.div key={activeSection} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+            <Routes>
+              <Route path="/" element={<TheCallView onNavigate={navigateFromDashboard} />} />
+              <Route path="/dashboard" element={<DashboardView onNavigate={navigateFromDashboard} />} />
+              <Route path="/inbox" element={<InboxView />} />
+              <Route path="/pipeline" element={<PipelineView onNavigateToOrder={navigateToOrder} />} />
+              <Route path="/orders/:orderId" element={<OrderDetailView dealId={selectedOrderId || ""} onBack={() => navigate("/orders")} />} />
+              <Route path="/orders" element={<OrdersView onNavigateToOrder={navigateToOrder} />} />
+              <Route path="/offers" element={<OffersView />} />
+              <Route path="/purchase-orders" element={<PurchaseOrdersView />} />
+              <Route path="/customers" element={<CustomersView />} />
+              <Route path="/vendors" element={<VendorsView />} />
+              <Route path="/invoices" element={<InvoicesView />} />
+              <Route path="/shipping" element={<ShippingView />} />
+              <Route path="/documents" element={<DocumentsView />} />
+              <Route path="/items" element={<ItemsView onNavigate={navigateFromDashboard} />} />
+              <Route path="/buys" element={<BuysView onNavigate={navigateFromDashboard} />} />
+              <Route path="/brands" element={<BrandsView />} />
+              <Route path="/wishlist" element={<WishlistView />} />
+              <Route path="/finance" element={<FinanceView />} />
+              <Route path="/analytics" element={<AnalyticsView />} />
+              <Route path="/audit" element={<AuditView />} />
+              <Route path="/activity" element={<ActivityView />} />
+              <Route path="/recon" element={<ReconView />} />
+              {/* Fallback */}
+              <Route path="*" element={<TheCallView onNavigate={navigateFromDashboard} />} />
+            </Routes>
+          </motion.div>
         </AnimatePresence>
       </div>
 
-      {/* ═══════ TOASTS ═══════ */}
+      {/* Command Palette */}
+      <CommandPalette
+        open={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        onNavigate={navigateFromPalette}
+      />
+
+      {/* Toasts */}
       <div className="fixed bottom-4 right-4 z-50 space-y-2">
         <AnimatePresence>
           {toasts.map(toast => (
-            <motion.div
-              key={toast.id}
+            <motion.div key={toast.id}
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700/50 text-xs text-zinc-200 flex items-center gap-2 shadow-lg"
-            >
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              className="px-4 py-2.5 rounded-lg bg-white/90 backdrop-blur-xl border border-divider text-xs text-text-primary flex items-center gap-2 shadow-[var(--shadow-md)]">
+              <Check className="w-3.5 h-3.5 text-emerald-500" />
               {toast.message}
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
 
-      {/* ═══════ KEYBOARD SHORTCUTS ═══════ */}
+      {/* Keyboard Shortcuts */}
       <AnimatePresence>
         {showKeys && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowKeys(false)}
-            className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center"
-          >
-            <motion.div
-              initial={{ scale: 0.95 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.95 }}
-              onClick={e => e.stopPropagation()}
-              className="w-80 rounded-xl bg-zinc-900 border border-zinc-800/60 p-5 shadow-2xl"
-            >
-              <h3 className="text-sm font-semibold text-white mb-3">Keyboard Shortcuts</h3>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setShowKeys(false)} className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm flex items-center justify-center">
+            <Card variant="elevated" className="w-80 p-5 shadow-[var(--shadow-lg)]" onClick={e => e.stopPropagation()}>
+              <h3 className="text-sm font-semibold text-text-primary mb-3">Keyboard Shortcuts</h3>
               <div className="space-y-1.5 text-xs">
                 {[
-                  { key: "j/k", action: "Navigate emails" },
-                  { key: "e", action: "Archive" },
-                  { key: "s", action: "Star/unstar" },
-                  { key: "i", action: "Toggle intelligence panel" },
+                  { key: "⌘K", action: "Command palette" },
+                  { key: "1/2/3/4", action: "Execute action (The Call)" },
+                  { key: "j/k", action: "Navigate cards / emails" },
+                  { key: "Tab", action: "Next split (The Call)" },
+                  { key: "e", action: "Expand card / Archive email" },
+                  { key: "z", action: "Undo last decision" },
                   { key: "?", action: "Show shortcuts" },
                 ].map(s => (
                   <div key={s.key} className="flex items-center justify-between py-1">
-                    <span className="text-zinc-400">{s.action}</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[10px]">{s.key}</kbd>
+                    <span className="text-text-secondary">{s.action}</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-canvas text-text-primary font-mono text-[10px] border border-divider">{s.key}</kbd>
                   </div>
                 ))}
               </div>
-            </motion.div>
+            </Card>
           </motion.div>
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// ============================================================================
+// ROOT — wraps everything in BrowserRouter
+// ============================================================================
+
+export default function App() {
+  return (
+    <BrowserRouter basename="/app">
+      <AppShell />
+    </BrowserRouter>
   );
 }

@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
 @theme {
+  /* ── Canvas (Apple two-tone) ─────────────────────────────── */
+  --color-canvas: #F5F3F7;
+  --color-card: #FFFFFF;
+  --color-sidebar: #FAFAF9;
+  --color-hover: #F3EFFB;
+  --color-selected: #EDE5F9;
+  --color-divider: rgba(0, 0, 0, 0.06);
+
+  /* ── Brand Palette (DSV2) ────────────────────────────────── */
   --color-sage-50: #f4f7f4;
   --color-sage-100: #e4ebe3;
   --color-sage-200: #c8d7c6;
@@ -8,9 +17,6 @@
   --color-sage-400: #8ba888;
   --color-sage-500: #6b8f68;
   --color-sage-600: #547352;
-  --color-sage-700: #435c42;
-  --color-sage-800: #374a37;
-  --color-sage-900: #2e3d2e;
 
   --color-lavender-50: #f5f3f8;
   --color-lavender-100: #ede8f3;
@@ -20,23 +26,487 @@
   --color-lavender-500: #8161a8;
   --color-lavender-600: #6b4c8e;
 
+  /* ── Text (dark-on-light, purple-warm undertone) ─────────── */
+  --color-text-primary: #1A1625;
+  --color-text-secondary: #6B6480;
+  --color-text-tertiary: #716B84;
+  --color-text-disabled: #C4C0CC;
+
+  /* ── 3-Way Pricing (SACRED) ──────────────────────────────── */
+  --color-vendor: #3B82F6;
+  --color-tevah: #9333EA;
+  --color-customer: #059669;
+
+  /* ── Advisor Colors ──────────────────────────────────────── */
+  --color-advisor-shark: #E11D48;
+  --color-advisor-shark-ghost: rgba(225, 29, 72, 0.35);
+  --color-advisor-comptroller: #059669;
+  --color-advisor-comptroller-ghost: rgba(5, 150, 105, 0.35);
+  --color-advisor-watchtower: #0891B2;
+  --color-advisor-watchtower-ghost: rgba(8, 145, 178, 0.35);
+  --color-advisor-negotiator: #D97706;
+  --color-advisor-negotiator-ghost: rgba(217, 119, 6, 0.35);
+  --color-advisor-savant: #7C3AED;
+  --color-advisor-savant-ghost: rgba(124, 58, 237, 0.35);
+
+  /* ── Typography ──────────────────────────────────────────── */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+}
+
+/* ── Purple-Tinted Layered Shadows (Josh Comeau technique) ── */
+:root {
+  --shadow-color: 260deg 8% 50%;
+
+  --shadow-sm:
+    0.3px 0.5px 0.7px hsl(var(--shadow-color) / 0.06),
+    0.4px 0.8px 1px -1.2px hsl(var(--shadow-color) / 0.06),
+    1px 2px 2.5px -2.5px hsl(var(--shadow-color) / 0.06);
+
+  --shadow-md:
+    0.3px 0.5px 0.7px hsl(var(--shadow-color) / 0.07),
+    0.8px 1.6px 2px -0.8px hsl(var(--shadow-color) / 0.07),
+    2.1px 4.1px 5.2px -1.7px hsl(var(--shadow-color) / 0.07),
+    5px 10px 12.6px -2.5px hsl(var(--shadow-color) / 0.07);
+
+  --shadow-lg:
+    0.3px 0.5px 0.7px hsl(var(--shadow-color) / 0.05),
+    1.5px 2.9px 3.7px -0.4px hsl(var(--shadow-color) / 0.05),
+    2.7px 5.4px 6.8px -0.7px hsl(var(--shadow-color) / 0.05),
+    4.5px 8.9px 11.2px -1.1px hsl(var(--shadow-color) / 0.05),
+    7.1px 14.3px 18px -1.4px hsl(var(--shadow-color) / 0.05),
+    11.2px 22.3px 28.1px -1.8px hsl(var(--shadow-color) / 0.05);
+
+  /* ── The Weather (atmospheric canvas shifts) ── */
+  --weather-healthy: #F3F5F4;
+  --weather-warning: #F7F5F2;
+  --weather-danger: #F7F2F2;
+  --weather-current: var(--color-canvas);
 }
 
 @layer base {
-  * { border-color: theme(colors.zinc.800 / 40%); }
+  * { border-color: var(--color-divider); }
   body {
-    @apply bg-zinc-950 text-zinc-100 antialiased m-0;
+    background-color: var(--color-canvas);
+    color: var(--color-text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    margin: 0;
   }
-  #root { @apply min-h-screen; }
+  #root { min-height: 100vh; }
 }
 
+/* ── Scrollbar (light) ──────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: theme(colors.zinc.800); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: theme(colors.zinc.700); }
+::-webkit-scrollbar-thumb { background: #d4d0dc; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #b8b2c4; }
+
+/* ── Utilities ──────────────────────────────────────────────── */
 .tabular-nums { font-variant-numeric: tabular-nums; }
 .scrollbar-none { scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* ── AI Ghost Values ────────────────────────────────────────── */
+.ai-ghost {
+  color: rgba(107, 100, 128, 0.40);
+  font-style: italic;
+  border-bottom: 1px dashed currentColor;
+  cursor: pointer;
+  transition: all 0.08s ease;
+}
+.ai-ghost:hover {
+  color: rgba(107, 100, 128, 0.65);
+}
+.ai-ghost.confirmed {
+  color: var(--color-text-primary);
+  font-style: normal;
+  border-bottom: none;
+  font-weight: 500;
+}
+
+/* ── Breathing Border (advisor active moments) ──────────────── */
+@property --ai-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+.advisor-breathing {
+  position: relative;
+  overflow: visible;
+}
+.advisor-breathing::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(from var(--ai-angle),
+    var(--advisor-color-1, #9333EA),
+    var(--advisor-color-2, #EC4899),
+    var(--advisor-color-3, #06B6D4),
+    var(--advisor-color-1, #9333EA));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ai-breathe 4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes ai-breathe {
+  to { --ai-angle: 360deg; }
+}
+
+/* ── Glass Deep (Apple glass for The Call cards) ───────────────── */
+.glass-deep {
+  position: relative;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -0.5px 0 rgba(0, 0, 0, 0.04),
+    var(--shadow-md);
+}
+/* Specular highlight — light-from-above gradient */
+.glass-deep::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.04) 12%, transparent 50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Type Halo (colored glow via ::after — no shadow collision) ── */
+.type-halo { position: relative; }
+.type-halo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 1px var(--halo-color, rgba(147, 51, 234, 0.15)),
+    0 0 15px var(--halo-color, rgba(147, 51, 234, 0.10)),
+    0 0 45px var(--halo-color, rgba(147, 51, 234, 0.04));
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Glass Surface System (4 tiers, replaces 11 scattered bg-white/XX) ── */
+.glass-tint { background: rgba(255, 255, 255, 0.35); }
+.glass-surface {
+  background: rgba(255, 255, 255, 0.50);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+.glass-elevated {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+.glass-overlay {
+  background: rgba(255, 255, 255, 0.80);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+}
+
+/* ── Focus Ring (keyboard accessibility) ──────────────────────── */
+.focus-ring:focus-visible {
+  outline: 2px solid rgba(147, 51, 234, 0.4);
+  outline-offset: 2px;
+}
+
+/* ── Brain Pulse (loading indicator) ───────────────────────────── */
+@keyframes brain-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+.brain-pulse {
+  animation: brain-pulse 1.5s ease-in-out infinite;
+}
+
+/* ── The Weather (canvas atmospheric shift) ─────────────────── */
+.weather-transition {
+  transition: background-color 8s ease-in-out;
+}
+
+/* ── Depth-of-Field (card stack parallax) ──────────────────── */
+.card-depth-1 {
+  filter: blur(0.5px) brightness(0.97);
+  pointer-events: none;
+}
+.card-depth-2 {
+  filter: blur(1.6px) brightness(0.93);
+  pointer-events: none;
+}
+.card-promoting {
+  animation: card-promote 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes card-promote {
+  0% { filter: blur(0.5px) brightness(0.97); }
+  100% { filter: blur(0) brightness(1); }
+}
+
+/* ── Action Particles ──────────────────────────────────────── */
+@keyframes particle-fly {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+}
+.particle {
+  position: absolute;
+  width: var(--size, 4px);
+  height: var(--size, 4px);
+  border-radius: 50%;
+  background: var(--color);
+  animation: particle-fly var(--duration, 0.6s) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* ── Milestone Flash ───────────────────────────────────────── */
+@keyframes milestone-reveal {
+  0% { opacity: 0; transform: scale(0.7) translateY(8px); filter: blur(4px); }
+  40% { opacity: 1; transform: scale(1.06) translateY(-2px); filter: blur(0); }
+  70% { transform: scale(0.98) translateY(0); }
+  100% { opacity: 0; transform: scale(1) translateY(-4px); }
+}
+.milestone-badge {
+  animation: milestone-reveal 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  pointer-events: none;
+}
+
+/* ── Canvas Grain (subtle texture — not digital-flat) ──────── */
+.canvas-grain::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.022;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+  pointer-events: none;
+  z-index: 999;
+  mix-blend-mode: multiply;
+}
+
+/* ── Weather Canvas (live portfolio health atmosphere) ──────── */
+.weather-healthy { background-color: hsl(270, 20%, 97%); }
+.weather-warning { background-color: hsl(40, 20%, 97%); }
+.weather-danger  { background-color: hsl(0, 18%, 97%); }
+
+/* ── Ghost Values (AI-suggested — spectral until confirmed) ── */
+.ghost-value {
+  color: var(--purple-500, #9333EA);
+  opacity: 0.35;
+  font-style: italic;
+  transition: opacity 0.3s ease, color 0.3s ease;
+}
+.ghost-value:hover {
+  opacity: 0.65;
+}
+.ghost-value.confirmed {
+  opacity: 1;
+  font-style: normal;
+  color: inherit;
+}
+
+/* ── The Call — Dark Command Center Scope ──────────────────── */
+.the-call {
+  --color-canvas: #0C0A14;
+  --color-card: rgba(255,255,255,0.04);
+  --color-text-primary: #E8E6EF;
+  --color-text-secondary: #A09CB0;
+  --color-text-tertiary: #8A86A0;
+  --color-text-disabled: #6B677E;
+  --color-divider: rgba(255,255,255,0.10);
+  --color-hover: rgba(255,255,255,0.04);
+  --color-selected: rgba(147,51,234,0.20);
+  --shadow-color: 260deg 8% 8%;
+  color-scheme: dark;
+}
+/* Cards revert to light-on-white (spotlight on dark stage) */
+.the-call .glass-deep {
+  --color-text-primary: #1A1625;
+  --color-text-secondary: #6B6480;
+  --color-text-tertiary: #5E5873;
+  --color-text-disabled: #B0ABBC;
+  --color-divider: rgba(0, 0, 0, 0.06);
+  --color-canvas: #F5F3F7;
+  --color-card: #FFFFFF;
+  --color-hover: #F3EFFB;
+  --color-selected: #EDE5F9;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 8px 32px rgba(0,0,0,0.4),
+    0 2px 8px rgba(0,0,0,0.2),
+    inset 0 0.5px 0 rgba(255,255,255,0.8);
+}
+.the-call .glass-deep::before {
+  background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.08) 10%, transparent 40%);
+}
+/* Glass inside cards stays LIGHT (card is the spotlight) */
+.the-call .glass-deep .glass-surface {
+  background: rgba(255, 255, 255, 0.50);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+.the-call .glass-deep .glass-tint {
+  background: rgba(255, 255, 255, 0.35);
+}
+.the-call .glass-deep .glass-elevated {
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+/* Dark chrome (header, tabs, context panel, ticker) */
+.the-call .glass-overlay {
+  background: rgba(12, 10, 20, 0.90);
+  border-color: rgba(255,255,255,0.06);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.the-call .glass-elevated {
+  background: rgba(20, 17, 32, 0.80);
+  border-color: rgba(255,255,255,0.06);
+}
+.the-call .glass-surface {
+  background: rgba(30, 26, 42, 0.65);
+  border-color: rgba(255,255,255,0.06);
+}
+.the-call .glass-tint {
+  background: rgba(255, 255, 255, 0.04);
+}
+/* OVERRIDE: glass INSIDE cards stays light with lavender tint (higher specificity) */
+.the-call .glass-deep .glass-surface,
+.the-call .glass-deep .glass-surface.border {
+  background: rgba(237, 233, 248, 0.65);
+  border-color: rgba(100, 60, 180, 0.08);
+}
+.the-call .glass-deep .glass-tint {
+  background: rgba(237, 233, 248, 0.40);
+}
+.the-call .glass-deep .glass-elevated {
+  background: rgba(243, 240, 252, 0.75);
+  border-color: rgba(100, 60, 180, 0.08);
+}
+/* Dramatic glow on dark */
+.the-call .type-halo::after {
+  box-shadow:
+    0 0 0 1px var(--halo-color, rgba(147,51,234,0.30)),
+    0 0 30px var(--halo-color, rgba(147,51,234,0.25)),
+    0 0 80px var(--halo-color, rgba(147,51,234,0.10));
+}
+/* Heavy depth-of-field on dark */
+.the-call .card-depth-1 {
+  filter: blur(3px) brightness(0.65);
+}
+.the-call .card-depth-2 {
+  filter: blur(6px) brightness(0.45);
+}
+/* Dark weather (perceptible atmospheric shifts) */
+.the-call.weather-healthy,
+.the-call .weather-healthy { background-color: #0C0A14; }
+.the-call.weather-warning,
+.the-call .weather-warning { background-color: #14100A; }
+.the-call.weather-danger,
+.the-call .weather-danger  { background-color: #1A0808; }
+/* Screen flash — full-viewport color wash on action */
+@keyframes screen-flash {
+  0% { opacity: 0.18; }
+  100% { opacity: 0; }
+}
+.screen-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 200;
+  border-radius: inherit;
+  animation: screen-flash 0.25s ease-out forwards;
+}
+/* Card shimmer — light sweep on entrance */
+@keyframes card-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.card-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255,255,255,0.30) 45%,
+    rgba(255,255,255,0.60) 50%,
+    rgba(255,255,255,0.30) 55%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: card-shimmer 1s ease-out 0.3s forwards;
+  pointer-events: none;
+  z-index: 2;
+}
+/* Dark scrollbar */
+.the-call ::-webkit-scrollbar-thumb { background: #3A3555; }
+.the-call ::-webkit-scrollbar-thumb:hover { background: #4A4565; }
+/* Dark action ticker pills */
+.the-call .action-pill {
+  background: rgba(147,51,234,0.15);
+  border-color: rgba(147,51,234,0.25);
+  color: #C4B5FD;
+}
+/* Dark held pile */
+.the-call .held-card {
+  background: rgba(217,119,6,0.08);
+  border-color: rgba(217,119,6,0.20);
+}
+
+/* ── Reduced Motion (WCAG 2.1 SC 2.3.3) ───────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .weather-transition { transition: none; }
+  .brain-pulse { animation: none; }
+  .advisor-breathing::before { animation: none; }
+}
+
+/* ── GSAP Deal Card — Animated Gradient Border ──────────────── */
+@property --grad-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes gradient-spin {
+  to { --grad-angle: 360deg; }
+}
+.gradient-border-spin {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--grad-angle),
+    transparent 25%,
+    rgba(139,92,246,0.3) 35%,
+    rgba(96,165,250,0.3) 50%,
+    rgba(6,182,212,0.2) 65%,
+    transparent 75%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: gradient-spin 6s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+/* Card content above the border */
+.gsap-deal-card > *:not(.gradient-border-spin) {
+  position: relative;
+  z-index: 2;
+}

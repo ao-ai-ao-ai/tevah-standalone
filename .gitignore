@@ -26,3 +26,19 @@ dist-ssr
 
 .env
 .env.*
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
+# Claude session artifacts
+.claude/
+*.jsonl
+
+# Audit/research docs (generated, not source)
+*-AUDIT*.md
+*-RESEARCH*.md
+*-ANALYSIS*.md
+*-DEEP-DIVE*.md
+HANDOVER*.md

@@ -1,181 +1,307 @@
-import { useState } from "react";
+/**
+ * CustomersView — Unified Monday + QuickBooks customers
+ *
+ * Shows real QB invoice data (AR, payment history, risk)
+ * merged with Monday deal data (pipeline, stages).
+ * Customer = BUYER (Tevah sells TO them, QB invoices go TO them).
+ */
+
+import { useState, useMemo } from "react";
 import { motion } from "motion/react";
-import { CUSTOMERS, ORDERS, STAGE_PIPELINE } from "../data/emails";
-import { cn, formatCurrency } from "../lib/utils";
+import { Search, AlertTriangle, TrendingDown, TrendingUp, Shield, Receipt } from "lucide-react";
+import { cn, formatCurrency, formatCurrencyExact } from "../lib/utils";
+import { Card } from "../components/card";
+import { StagePill } from "../components/stage-pill";
+import { useUnifiedData } from "../lib/use-unified";
+import type { UnifiedCustomer } from "../lib/entity-resolver";
+
+function riskColor(risk: string): string {
+  if (risk === "critical") return "text-red-600";
+  if (risk === "high") return "text-amber-600";
+  if (risk === "watch") return "text-yellow-600";
+  return "text-emerald-600";
+}
+
+function riskBg(risk: string): string {
+  if (risk === "critical") return "bg-red-50";
+  if (risk === "high") return "bg-amber-50";
+  if (risk === "watch") return "bg-yellow-50";
+  return "bg-emerald-50";
+}
 
 export default function CustomersView() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = CUSTOMERS.find(c => c.id === selectedId);
+  const { data, loading } = useUnifiedData();
+  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() =>
+    data.customers.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase())),
+    [data.customers, search]
+  );
+
+  const selected = data.customers.find(c => c.name === selectedName) ?? null;
+
+  // Find QB invoices for selected customer
+  const selectedInvoices = useMemo(() => {
+    if (!selected || !data.qbLoaded) return [];
+    const names = [selected.name, ...(selected.qbNames || [])].map(n => n.toLowerCase());
+    return data.invoices
+      .filter(inv => names.some(n => inv.customer.toLowerCase().includes(n) || n.includes(inv.customer.toLowerCase())))
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [selected, data]);
+
+  const totalRevenue = data.customers.reduce((s, c) => s + (c.qb?.totalInvoiced ?? c.mondaySellTotal), 0);
 
   return (
     <div className="h-full flex">
-      {/* Grid */}
-      <div className="flex-1 overflow-y-auto p-6">
+      {/* List Panel */}
+      <div className="flex-1 overflow-y-auto p-6 bg-sidebar">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-lg font-semibold text-white">Customers</h1>
-            <p className="text-xs text-zinc-500 mt-0.5">{CUSTOMERS.length} accounts — {formatCurrency(CUSTOMERS.reduce((s, c) => s + c.totalRevenue, 0))} lifetime revenue</p>
+            <h1 className="text-lg font-semibold text-text-primary">Customers</h1>
+            <p className="text-xs text-text-tertiary mt-0.5">
+              {data.customers.length} customers — {formatCurrency(totalRevenue)} total revenue
+              {data.qbLoaded && <span className="ml-1 text-emerald-600">(QB matched)</span>}
+            </p>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customers..."
+              className="h-8 pl-8 pr-3 w-48 text-xs bg-white border border-divider rounded-lg text-text-primary placeholder:text-text-disabled focus:outline-none focus:ring-1 focus:ring-purple-200 shadow-[var(--shadow-sm)]" />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
-          {CUSTOMERS.map((cust, i) => (
-            <motion.button
-              key={cust.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
-              onClick={() => setSelectedId(selectedId === cust.id ? null : cust.id)}
-              className={cn(
-                "text-left p-4 rounded-xl border transition-all",
-                selectedId === cust.id
-                  ? "bg-violet-500/5 border-violet-500/20"
-                  : "bg-zinc-900/40 border-zinc-800/40 hover:border-zinc-700/60 hover:bg-zinc-800/30"
-              )}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500/20 to-blue-500/20 flex items-center justify-center">
-                    <span className="text-[10px] font-bold text-violet-300">{cust.name.charAt(0)}</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">{cust.name}</p>
-                    <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-medium",
-                      cust.tier === "Platinum" ? "bg-violet-500/10 text-violet-400" :
-                      cust.tier === "Gold" ? "bg-amber-500/10 text-amber-400" :
-                      cust.tier === "Silver" ? "bg-zinc-500/10 text-zinc-400" :
-                      "bg-zinc-800 text-zinc-500"
-                    )}>{cust.tier}</span>
-                  </div>
-                </div>
+        <div className="grid grid-cols-2 gap-3">
+          {filtered.map((cust, i) => {
+            const revenue = cust.qb?.totalInvoiced ?? cust.mondaySellTotal;
+            const unpaid = cust.qb?.totalUnpaid ?? 0;
+            const pctUnpaid = cust.qb?.pctUnpaid ?? 0;
+            const invoiceCount = cust.qb?.invoiceCount ?? 0;
+            const isSelected = selectedName === cust.name;
 
-                {/* Health */}
-                {cust.healthScore > 0 && (
-                  <div className={cn("text-lg font-bold tabular-nums",
-                    cust.healthScore >= 80 ? "text-emerald-400" :
-                    cust.healthScore >= 60 ? "text-amber-400" : "text-red-400"
-                  )}>
-                    {cust.healthScore}
-                  </div>
+            return (
+              <motion.button
+                key={cust.name}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i * 0.03, 0.6) }}
+                onClick={() => setSelectedName(isSelected ? null : cust.name)}
+                className={cn(
+                  "text-left p-4 rounded-[10px] transition-all bg-white",
+                  isSelected
+                    ? "ring-1 ring-purple-200 shadow-[var(--shadow-md)]"
+                    : "hover:shadow-[var(--shadow-sm)] hover:bg-hover"
                 )}
-              </div>
+              >
+                {/* Source badges */}
+                <div className="flex items-center gap-1 mb-2">
+                  {cust.mondayName && <span className="text-[8px] px-1 py-0.5 rounded bg-blue-50 text-blue-600">Monday</span>}
+                  {cust.qbNames.length > 0 && <span className="text-[8px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-600">QB</span>}
+                  {cust.qbNames.length === 0 && cust.mondayName && <span className="text-[8px] px-1 py-0.5 rounded bg-amber-50 text-amber-600">No QB match</span>}
+                </div>
 
-              {/* Metrics */}
-              <div className="grid grid-cols-2 gap-2 text-[10px]">
-                <div>
-                  <span className="text-zinc-600">Revenue</span>
-                  <p className="text-xs font-semibold text-zinc-200 tabular-nums">{cust.totalRevenue > 0 ? formatCurrency(cust.totalRevenue) : "—"}</p>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", riskBg(cust.risk))}>
+                    <span className={cn("text-[10px] font-bold uppercase", riskColor(cust.risk))}>{cust.risk === "clean" ? "OK" : cust.risk.slice(0, 4)}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{cust.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] text-text-tertiary">{cust.dealCount} deals</p>
+                      {invoiceCount > 0 && <p className="text-[10px] text-text-tertiary">· {invoiceCount} invoices</p>}
+                      {unpaid > 5000 && (
+                        <span className="text-[9px] text-red-500 flex items-center gap-0.5">
+                          <AlertTriangle className="w-2.5 h-2.5" />{formatCurrency(unpaid)} unpaid
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-zinc-600">Avg Margin</span>
-                  <p className={cn("text-xs font-semibold tabular-nums", cust.avgMargin >= 15 ? "text-emerald-400" : cust.avgMargin >= 10 ? "text-amber-400" : "text-zinc-400")}>
-                    {cust.avgMargin > 0 ? `${cust.avgMargin}%` : "—"}
-                  </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <span className="text-[9px] text-text-tertiary">Revenue</span>
+                    <p className="text-xs font-bold text-text-primary tabular-nums">{formatCurrency(revenue)}</p>
+                  </div>
+                  <div className="border-l-2 border-l-advisor-comptroller pl-2">
+                    <span className="text-[9px] text-text-tertiary">{cust.qb ? "Unpaid" : "Spread"}</span>
+                    <p className={cn("text-xs font-bold tabular-nums", unpaid > 0 ? "text-amber-600" : "text-emerald-600")}>
+                      {cust.qb ? formatCurrency(unpaid) : formatCurrency(cust.mondaySellTotal - cust.mondayBuyTotal)}
+                    </p>
+                  </div>
+                  <div className="border-l-2 border-l-advisor-shark pl-2">
+                    <span className="text-[9px] text-text-tertiary">% Unpaid</span>
+                    <p className={cn("text-xs font-bold tabular-nums",
+                      pctUnpaid >= 50 ? "text-red-500" : pctUnpaid >= 30 ? "text-amber-600" : "text-emerald-600"
+                    )}>{pctUnpaid > 0 ? `${pctUnpaid.toFixed(0)}%` : "0%"}</p>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-zinc-600">Deals</span>
-                  <p className="text-xs font-semibold text-zinc-200">{cust.deals} ({cust.wonDeals} won)</p>
-                </div>
-                <div>
-                  <span className="text-zinc-600">Open Orders</span>
-                  <p className="text-xs font-semibold text-zinc-200">{cust.openOrders}</p>
-                </div>
-              </div>
-            </motion.button>
-          ))}
+              </motion.button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Detail panel */}
+      {/* Detail Panel */}
       {selected && (
         <motion.div
           initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 360, opacity: 1 }}
-          className="flex-none w-[360px] border-l border-zinc-800/60 overflow-y-auto"
+          animate={{ width: 400, opacity: 1 }}
+          className="flex-none w-[400px] border-l border-divider overflow-y-auto bg-white"
         >
-          <div className="p-4 border-b border-zinc-800/60">
+          <div className="p-4 border-b border-divider">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500/20 to-blue-500/20 flex items-center justify-center">
-                <span className="text-lg font-bold text-violet-300">{selected.name.charAt(0)}</span>
+              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", riskBg(selected.risk))}>
+                <span className={cn("text-sm font-bold uppercase", riskColor(selected.risk))}>{selected.risk}</span>
               </div>
               <div>
-                <p className="text-base font-semibold text-white">{selected.name}</p>
-                <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-                  selected.tier === "Platinum" ? "bg-violet-500/10 text-violet-400" :
-                  selected.tier === "Gold" ? "bg-amber-500/10 text-amber-400" : "bg-zinc-800 text-zinc-500"
-                )}>{selected.tier}</span>
+                <p className="text-base font-semibold text-text-primary">{selected.name}</p>
+                <p className="text-xs text-text-tertiary">
+                  {selected.dealCount} deals
+                  {selected.qb && ` · ${selected.qb.invoiceCount} invoices`}
+                </p>
+                {selected.qbNames.length > 0 && (
+                  <p className="text-[10px] text-emerald-600 mt-0.5">QB: {selected.qbNames.join(", ")}</p>
+                )}
               </div>
             </div>
           </div>
 
           <div className="p-4 space-y-4">
-            {/* Health bar */}
-            {selected.healthScore > 0 && (
-              <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/40">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Health Score</span>
-                  <span className={cn("text-2xl font-bold tabular-nums",
-                    selected.healthScore >= 80 ? "text-emerald-400" :
-                    selected.healthScore >= 60 ? "text-amber-400" : "text-red-400"
-                  )}>{selected.healthScore}</span>
+            {/* Financial Summary */}
+            <div className="grid grid-cols-2 gap-2">
+              <Card variant="elevated" className="p-2.5">
+                <span className="text-[9px] text-text-tertiary uppercase">
+                  {selected.qb ? "Total Invoiced" : "Monday Revenue"}
+                </span>
+                <p className="text-sm font-bold text-text-primary tabular-nums">
+                  {formatCurrency(selected.qb?.totalInvoiced ?? selected.mondaySellTotal)}
+                </p>
+              </Card>
+              <Card variant="elevated" className="p-2.5">
+                <span className="text-[9px] text-text-tertiary uppercase">
+                  {selected.qb ? "Unpaid Balance" : "Spread"}
+                </span>
+                <p className={cn("text-sm font-bold tabular-nums",
+                  selected.qb ? (selected.qb.totalUnpaid > 0 ? "text-amber-600" : "text-emerald-600") : "text-emerald-600"
+                )}>
+                  {selected.qb ? formatCurrency(selected.qb.totalUnpaid) : formatCurrency(selected.mondaySellTotal - selected.mondayBuyTotal)}
+                </p>
+              </Card>
+            </div>
+
+            {/* QB Invoice Analysis (Comptroller) */}
+            {selected.qb && (
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Shield className="w-3 h-3 text-advisor-comptroller" />
+                  <span className="text-[10px] text-advisor-comptroller uppercase tracking-wider font-semibold">Comptroller — QB Analysis</span>
                 </div>
-                <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${selected.healthScore}%` }}
-                    transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
-                    className={cn("h-full rounded-full",
-                      selected.healthScore >= 80 ? "bg-emerald-500" :
-                      selected.healthScore >= 60 ? "bg-amber-500" : "bg-red-500"
-                    )}
-                  />
+                <div className="space-y-2">
+                  {selected.qb.pctUnpaid >= 50 && (
+                    <div className="p-2.5 rounded-lg bg-red-50 border-l-2 border-l-red-400">
+                      <p className="text-[11px] text-red-600 font-medium">
+                        {selected.qb.pctUnpaid.toFixed(0)}% unpaid — {formatCurrency(selected.qb.totalUnpaid)} outstanding
+                      </p>
+                      <p className="text-[10px] text-text-tertiary mt-0.5">Payment collection risk: HIGH</p>
+                    </div>
+                  )}
+                  {selected.qb.pctUnpaid > 0 && selected.qb.pctUnpaid < 50 && (
+                    <div className="p-2.5 rounded-lg bg-amber-50 border-l-2 border-l-amber-400">
+                      <p className="text-[11px] text-amber-700 font-medium">
+                        {selected.qb.pctUnpaid.toFixed(0)}% unpaid — {formatCurrency(selected.qb.totalUnpaid)} outstanding
+                      </p>
+                    </div>
+                  )}
+                  {selected.qb.pctUnpaid === 0 && (
+                    <div className="p-2.5 rounded-lg bg-emerald-50 border-l-2 border-l-emerald-400">
+                      <p className="text-[11px] text-emerald-700 font-medium">All invoices paid in full</p>
+                    </div>
+                  )}
+                  <Card variant="elevated" className="p-2.5">
+                    <p className="text-[10px] text-text-secondary">Last invoice: <span className="text-text-primary font-medium">{selected.qb.lastInvoiceDate}</span></p>
+                    <p className="text-[10px] text-text-secondary mt-1">Invoice count: <span className="text-text-primary font-medium">{selected.qb.invoiceCount}</span></p>
+                  </Card>
                 </div>
               </div>
             )}
 
-            {/* Financial summary */}
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: "Lifetime Revenue", value: selected.totalRevenue > 0 ? formatCurrency(selected.totalRevenue) : "—" },
-                { label: "Total Profit", value: selected.totalProfit > 0 ? formatCurrency(selected.totalProfit) : "—" },
-                { label: "Avg Margin", value: selected.avgMargin > 0 ? `${selected.avgMargin}%` : "—" },
-                { label: "Total Deals", value: `${selected.deals} (${selected.wonDeals} won)` },
-                { label: "Open Orders", value: String(selected.openOrders) },
-                { label: "Last Order", value: selected.lastOrder },
-              ].map(m => (
-                <div key={m.label} className="p-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800/40">
-                  <span className="text-[9px] text-zinc-600 uppercase tracking-wider">{m.label}</span>
-                  <p className="text-sm font-semibold text-zinc-200 tabular-nums mt-0.5">{m.value}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Recent orders for this customer */}
+            {/* Watchtower */}
             <div>
-              <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Orders</span>
-              <div className="mt-2 space-y-1.5">
-                {ORDERS.filter(o => o.customer === selected.name).map(order => {
-                  const stageInfo = STAGE_PIPELINE.find(s => s.code === order.stageCode);
-                  return (
-                    <div key={order.id} className="flex items-center justify-between p-2 rounded-md hover:bg-zinc-800/30 transition-colors">
-                      <div>
-                        <span className="text-[10px] font-mono text-zinc-400">#{order.orderNumber}</span>
-                        <span className={cn("ml-2 text-[9px] px-1 py-0.5 rounded",
-                          stageInfo?.bgColor,
-                          stageInfo?.color
-                        )}>{order.stageCode}</span>
-                        <span className="ml-1 text-[10px] text-zinc-500">{order.brand}</span>
-                      </div>
-                      <span className="text-[11px] text-zinc-400 font-mono tabular-nums">{formatCurrency(order.totalAmount)}</span>
-                    </div>
-                  );
-                })}
-                {ORDERS.filter(o => o.customer === selected.name).length === 0 && (
-                  <p className="text-xs text-zinc-600 py-2">No orders in top 30</p>
+              <div className="flex items-center gap-1.5 mb-2">
+                <TrendingUp className="w-3 h-3 text-advisor-watchtower" />
+                <span className="text-[10px] text-advisor-watchtower uppercase tracking-wider font-semibold">Watchtower</span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-cyan-50 border-l-2 border-l-advisor-watchtower">
+                {selected.dealCount > 10 ? (
+                  <p className="text-[11px] text-cyan-700">High-value customer — {selected.dealCount} deals across {selected.brands.length} brands.</p>
+                ) : selected.dealCount === 0 ? (
+                  <p className="text-[11px] text-amber-700 flex items-center gap-1">
+                    <TrendingDown className="w-3 h-3" /> QB-only customer — no Monday deals. Likely historical or direct.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-text-secondary">{selected.dealCount} deals. {selected.brands.length} brands.</p>
                 )}
               </div>
             </div>
+
+            {/* Brands */}
+            {selected.brands.length > 0 && (
+              <div>
+                <span className="text-[10px] text-text-tertiary uppercase tracking-wider">Brands ({selected.brands.length})</span>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {selected.brands.slice(0, 15).map(b => (
+                    <span key={b} className="text-[10px] px-2 py-0.5 rounded-full bg-canvas text-text-secondary border border-divider">{b}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* QB Invoices */}
+            {selectedInvoices.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Receipt className="w-3 h-3 text-blue-600" />
+                  <span className="text-[10px] text-blue-600 uppercase tracking-wider font-semibold">QB Invoices ({selectedInvoices.length})</span>
+                </div>
+                <div className="space-y-1.5 max-h-[250px] overflow-y-auto">
+                  {selectedInvoices.map(inv => (
+                    <div key={inv.id} className="flex items-center justify-between p-2 rounded-md hover:bg-hover transition-colors">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[10px] font-mono text-text-secondary flex-none">#{inv.docNumber}</span>
+                        <span className="text-[10px] text-text-tertiary">{inv.date}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-none">
+                        <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium",
+                          inv.status === "paid" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+                        )}>{inv.status}</span>
+                        <span className="text-[10px] font-mono text-text-primary tabular-nums">{formatCurrencyExact(inv.total)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Monday Deals */}
+            {selected.deals.length > 0 && (
+              <div>
+                <span className="text-[10px] text-text-tertiary uppercase tracking-wider">Monday Deals ({selected.deals.length})</span>
+                <div className="mt-2 space-y-1.5 max-h-[250px] overflow-y-auto">
+                  {selected.deals.sort((a, b) => b.sellTotal - a.sellTotal).slice(0, 30).map(deal => (
+                    <div key={deal.id} className="flex items-center justify-between p-2 rounded-md hover:bg-hover transition-colors">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[10px] font-mono text-text-secondary flex-none">#{deal.dealNumber}</span>
+                        <span className="text-[10px] text-text-tertiary truncate">{deal.brand}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-none">
+                        <StagePill stage={deal.stage} />
+                        {deal.sellTotal > 0 && <span className="text-[10px] font-mono text-text-secondary tabular-nums">{formatCurrency(deal.sellTotal)}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
       )}
